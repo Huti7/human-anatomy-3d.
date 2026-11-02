@@ -22,7 +22,7 @@ jobs:
         run: |
           rm -rf .git/hooks
           mkdir ../site
-          cp -r index.html css js lib model README.md .nojekyll ../site/
+          cp -r index.html css js lib model README.md ATTRIBUTION.md .nojekyll ../site/
           cd ../site
           git init -b gh-pages
           git config user.name "github-actions[bot]"
