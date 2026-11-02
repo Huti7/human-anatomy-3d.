@@ -2,7 +2,11 @@
   "name": "anatomica-model-builder",
   "private": true,
   "type": "module",
-  "description": "Builds model/anatomy.bin from js/anatomy.js (run: npm install && npm run build)",
-  "scripts": { "build": "node --import ./register.mjs build-model.mjs" },
-  "dependencies": { "meshoptimizer": "0.21.0" }
+  "description": "Builds model/ from the Human Atlas meshes (run: npm install && node convert-atlas.mjs <human-atlas/public/models>)",
+  "scripts": {
+    "build": "node convert-atlas.mjs"
+  },
+  "dependencies": {
+    "meshoptimizer": "0.21.0"
+  }
 }
