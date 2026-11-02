@@ -78,6 +78,19 @@ Standard Arabic medical references, including the Unified Medical Dictionary (WH
 
 Interface text, system descriptions, and the per-structure descriptions in Arabic were written for this project and carry the same licence as the rest of the source.
 
+### Z-Anatomy (added to the male body)
+
+64 structures that BodyParts3D does not model — the muscles of facial expression and chewing (frontalis, orbicularis oculi and oris, zygomaticus, levator and depressor muscles, risorius, mentalis, procerus, nasalis, corrugator, masseter, temporalis, pterygoids), the latissimus dorsi, rectus abdominis, internal oblique, transversus abdominis, quadratus lumborum, multifidus, rotatores and the thoracolumbar fascia — come from **Z-Anatomy** by Gauthier Kervyn, licensed under **CC BY-SA 4.0** (https://creativecommons.org/licenses/by-sa/4.0/, https://www.z-anatomy.com/).
+
+- Meshes as exported, decimated and aligned to BodyParts3D by the BodyExplorer project (https://github.com/JohanBellander/BodyExplorer, `public/anatomy.glb`, MIT code).
+- Adaptations here (`tools/extract-zanatomy.py`): millimetres converted to metres and Z-up to Y-up, then translated onto this site's male body by the median offset of the 384 BodyParts3D muscles both files share; normals quantised; compressed with meshoptimizer.
+- **Share-alike:** because the male muscle file (`model/male-muscles.bin`) contains this adapted material, that file is distributed under CC BY-SA 4.0.
+
+### Corrections made for this site
+
+- Removed the hair meshes (hair of head, eyebrows, pubic hair) from the male skin.
+- Moved structures the source files under the wrong system: tibialis anterior and posterior, fibularis longus, brevis and tertius, subscapularis, levator scapulae and tensor fasciae latae to the muscles; the calcaneal (Achilles) tendon, linea alba and iliotibial tract to the muscles as tendons and fascia; the female breast tissue and subcutaneous fat from the skin to the internal organs.
+
 ## Code
 
 - three.js r160 (MIT) — `lib/three.module.js`, `lib/OrbitControls.js`

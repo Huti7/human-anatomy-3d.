@@ -163,7 +163,20 @@ input { font: inherit; color: inherit; }
 
 /* ---------- atlas ---------- */
 #atlas { overflow-y: auto; background: var(--bg); }
-.atlas-head { padding: 22px max(28px, env(safe-area-inset-right, 0px)) 6px max(28px, env(safe-area-inset-left, 0px)); max-width: 1440px; margin: 0 auto; }
+.atlas-head {
+  position: sticky; top: 0; z-index: 5; background: color-mix(in srgb, var(--bg) 94%, transparent); backdrop-filter: blur(8px);
+  padding: 16px max(28px, env(safe-area-inset-right, 0px)) 12px max(28px, env(safe-area-inset-left, 0px)); border-bottom: 1px solid var(--line);
+}
+.atlas-head > * { max-width: 1384px; margin-left: auto; margin-right: auto; }
+.to-top {
+  position: fixed; right: max(20px, env(safe-area-inset-right, 0px)); bottom: calc(20px + env(safe-area-inset-bottom, 0px)); z-index: 12;
+  display: inline-flex; align-items: center; gap: 6px; padding: 10px 16px 10px 12px; border-radius: 999px;
+  border: 1px solid var(--dark); background: var(--dark); color: var(--accent-ink); font-weight: 600; font-size: 14px; box-shadow: var(--shadow);
+}
+.to-top svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.to-top:hover { filter: brightness(1.15); }
+.to-top[hidden] { display: none; }
+.note.za { background: #eef0e6; border-color: #d6dcc6; }
 .atlas-row { display: flex; gap: 14px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
 .cat-tabs { display: flex; gap: 8px; flex-wrap: wrap; min-width: 0; }
 .cat-tab {

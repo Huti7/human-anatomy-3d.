@@ -4,11 +4,16 @@
 //
 //   node convert-atlas.mjs /path/to/human-atlas/public/models
 //
+//   node convert-atlas.mjs /path/to/human-atlas/public/models /path/to/zanatomy-dir
+//
+// The optional second folder holds zanatomy.json/.bin from extract-zanatomy.py (face, deep back and
+// abdominal-wall muscles that BodyParts3D lacks); they are added to the male body.
 // Output: ../model/<sex>.json (manifest) and ../model/<sex>-<layer>.bin (meshoptimizer-encoded geometry).
 import { readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { MeshoptEncoder } from 'meshoptimizer';
 
 const SRC = process.argv[2];
+const EXTRA = process.argv[3];
 if (!SRC) { console.error('usage: node convert-atlas.mjs <human-atlas/public/models>'); process.exit(1); }
 await MeshoptEncoder.ready;
 
@@ -22,6 +27,25 @@ export const LAYER_OF = {
   cardiac: 'vessels', arterial: 'vessels', venous: 'vessels',
   lymphatic: 'lymph',
   respiratory: 'organs', digestive: 'organs', urinary: 'organs', endocrine: 'organs', reproductive: 'organs',
+  fascia: 'muscles',
+};
+
+// Corrections to the source classification (by structure name)
+const HAIR = /^(hair of head|eyebrow|pubic hair)$/i;
+const FIX = [
+  // muscles the source files under the skeleton or the joints
+  [/fibularis|tibialis (anterior|posterior)|subscapularis|levator scapulae|tensor fasciae latae/i, 'muscular'],
+  // heart muscle belongs with the heart
+  [/papillary muscle of (left|right) ventricle/i, 'cardiac'],
+  // tendons and fascia belong with the muscles (drawn white)
+  [/iliotibial tract|calcaneal tendon|linea alba/i, 'fascia'],
+  // internal breast and fat tissue is not the outer skin surface
+  [/adipose|^fat\b|mammary|lactiferous|suspensory ligaments/i, 'reproductive'],
+];
+const classify = (p) => {
+  if (HAIR.test(p.name)) return null;
+  for (const [re, sys] of FIX) if (re.test(p.name) && p.system !== 'brain') return sys;
+  return p.system;
 };
 const LAYERS = ['skin', 'bones', 'muscles', 'nerves', 'joints', 'vessels', 'lymph', 'organs'];
 const OUT = new URL('../model/', import.meta.url);
@@ -31,6 +55,20 @@ mkdirSync(OUT, { recursive: true });
 for (const [sex, manifestName, chunkPrefix] of [['male', 'atlas.json', 'body'], ['female', 'atlas-female.json', 'female']]) {
   const atlas = JSON.parse(readFileSync(`${SRC}/${manifestName}`, 'utf8'));
   const chunks = atlas.chunks.map((_, i) => readFileSync(`${SRC}/${chunkPrefix}-${i}.bin`));
+  let dropped = 0, fixed = 0;
+  atlas.parts = atlas.parts.filter((p) => {
+    const sys = classify(p);
+    if (sys === null) { dropped++; return false; }
+    if (sys !== p.system) { p.system = sys; fixed++; }
+    return true;
+  });
+  if (sex === 'male' && EXTRA) {
+    const extra = JSON.parse(readFileSync(`${EXTRA}/zanatomy.json`, 'utf8'));
+    chunks.push(readFileSync(`${EXTRA}/zanatomy.bin`));
+    for (const p of extra.parts) atlas.parts.push({ ...p, chunk: chunks.length - 1, extra: 'Z-Anatomy' });
+    console.log(`male: added ${extra.parts.length} Z-Anatomy structures`);
+  }
+  console.log(`${sex}: removed ${dropped} hair structures, reclassified ${fixed}`);
   const out = { sex, source: atlas.source, version: atlas.version, scope: atlas.scope, layers: {}, parts: [] };
   for (const layer of LAYERS) {
     const parts = atlas.parts.filter((p) => LAYER_OF[p.system] === layer);
@@ -48,7 +86,7 @@ for (const [sex, manifestName, chunkPrefix] of [['male', 'atlas.json', 'body'], 
       for (let k = 0; k < p.vertexCount; k++) for (let a = 0; a < 3; a++) nor[(v + k) * 4 + a] = Math.round((N[k * 3 + a] / 32767) * 127);
       for (let k = 0; k < p.indexCount; k++) idx[i + k] = I[k] + v;
       out.parts.push({
-        id: p.id, fma: p.conceptId, name: p.name, layer, system: p.system,
+        id: p.id, fma: p.conceptId, name: p.name, layer, system: p.system, ...(p.extra ? { src: p.extra } : {}),
         v: [v, p.vertexCount], i: [i, p.indexCount],
         b: p.bounds.map((c) => c.map((x) => +x.toFixed(4))),
       });

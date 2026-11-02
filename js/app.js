@@ -38,9 +38,9 @@ const PART_COLOR = {
   nervous: 0xe0b33e, brain: 0xdcaaa4, sensory: 0xbdd0d4, connective: 0xa9cfc5,
   cardiac: 0xa83a3c, arterial: 0xc23b2e, venous: 0x4f78a6, lymphatic: 0x8fae7f,
   respiratory: 0xd59aa2, digestive: 0xcf9f72, urinary: 0xb97c63, endocrine: 0xcfa59c, reproductive: 0xc8a499,
-  integumentary: 0xe2bc9c,
+  integumentary: 0xe2bc9c, fascia: 0xf1ebe0,
 };
-const SYSTEM_LABEL = Object.fromEntries(SOURCE_SYSTEMS.map((s) => [s.id, s.name]));
+const SYSTEM_LABEL = { ...Object.fromEntries(SOURCE_SYSTEMS.map((s) => [s.id, s.name])), fascia: 'Tendons & fascia' };
 const DEFAULT_ON = ['bones', 'muscles'];
 const HI = new THREE.Color(0x2a9d86);
 const HOVER = new THREE.Color(0xf2c86a);
@@ -150,9 +150,10 @@ for (const [k, I] of Object.entries(INFO)) {
     INFO_BY_NAME[s] ??= k;
   }
 }
+const INFO_NAMES = Object.keys(INFO_BY_NAME).filter((k) => k.length > 4).sort((a, b) => b.length - a.length);
 function describe(p) {
   const key = p.name.toLowerCase().trim(), base = baseName(p.name);
-  const infoKey = INFO_BY_NAME[base] ?? INFO_BY_NAME[key];
+  const infoKey = INFO_BY_NAME[base] ?? INFO_BY_NAME[key] ?? INFO_BY_NAME[INFO_NAMES.find((k) => base.endsWith(' ' + k) || base.startsWith(k + ' ')) ?? ''];
   const I = infoKey ? INFO[infoKey] : null;
   const own = EXPLANATIONS[key] ?? EXPLANATIONS[base] ?? EXPLANATIONS[EXPL_KEYS.find((k) => base.startsWith(k + ' ') || base.endsWith(' ' + k)) ?? ''];
   const system = SYSTEM_NOTES[p.sex]?.[p.system] ?? SOURCE_SYSTEMS.find((s) => s.id === p.system)?.description ?? '';
@@ -179,7 +180,11 @@ function floorShadow() {
   m.rotation.x = -Math.PI / 2; m.position.y = 0.001;
   return m;
 }
-const layerMaterial = () => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0 });
+const layerMaterial = (id) => id === 'skin'
+  ? new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: 0.52, metalness: 0, sheen: 0.5, sheenRoughness: 0.6, sheenColor: new THREE.Color(0xffd9c4), clearcoat: 0.08, clearcoatRoughness: 0.6 })
+  : id === 'muscles'
+    ? new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.48, metalness: 0 })
+    : new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0 });
 const overlayMaterial = (color, intensity = 0.45) => new THREE.MeshStandardMaterial({
   color, emissive: color, emissiveIntensity: intensity, roughness: 0.5, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
 });
@@ -212,6 +217,8 @@ controls.dampingFactor = 0.08;
 controls.minDistance = 0.12;
 controls.maxDistance = 7;
 controls.autoRotateSpeed = 1.4;
+controls.zoomToCursor = true; // scroll/pinch zooms toward the point under the pointer
+controls.zoomSpeed = 1.1;
 const bodyGroup = new THREE.Group();
 scene.add(bodyGroup);
 const meshes = {}; // `${sex}:${layer}` -> mesh
@@ -228,7 +235,7 @@ function layerMesh(sex, id) {
   const k = `${sex}:${id}`;
   if (!meshes[k]) {
     const L = bodies[sex].layers[id];
-    const m = new THREE.Mesh(L.geo, layerMaterial());
+    const m = new THREE.Mesh(L.geo, layerMaterial(id));
     m.userData = { sex, layer: id };
     bodyGroup.add(m);
     meshes[k] = m;
@@ -363,6 +370,12 @@ renderer.domElement.addEventListener('pointerup', (ev) => {
   if (p) select(p); else deselect();
 });
 
+// double-click (or double-tap) a structure to fly to it
+renderer.domElement.addEventListener('dblclick', (ev) => {
+  const p = pick(ev, renderer.domElement, camera, visibleMeshes());
+  if (p) { select(p); focusPart(p); }
+});
+
 function select(p, focus = false) {
   state.selected = p;
   selMesh.geometry = partGeometry(p);
@@ -371,7 +384,7 @@ function select(p, focus = false) {
   applyVisibility();
   renderInfo(p);
   openPanel('infoPanel');
-  if (focus) focusBox(partBox(p));
+  if (focus) focusPart(p);
 }
 function deselect() {
   state.selected = null;
@@ -389,6 +402,8 @@ function infoHTML(p, actions = '') {
     ? '<div class="note"><b>Male-derived bone</b>The female reference has no skull, rib, arm or foot bones of its own, so this bone is taken from the male reference body and fitted into place.</div>' : '';
   const donor = p.system === 'donor-muscle'
     ? '<div class="note"><b>Donor muscle</b>This leg muscle comes from a second female body (the Visible Human Female), fitted to this skeleton, because the female reference models almost no muscle of its own.</div>' : '';
+  const za = p.src === 'Z-Anatomy'
+    ? '<div class="note za"><b>Added from Z-Anatomy</b>BodyParts3D has no model of this structure, so it comes from the open Z-Anatomy atlas (CC BY-SA 4.0), which is built on the same body.</div>' : '';
   const sexNote = d.sexNote ? `<div class="note"><b>Male vs female</b>${esc(d.sexNote)}</div>` : '';
   return `
     <div class="badges">
@@ -401,7 +416,7 @@ function infoHTML(p, actions = '') {
     <p class="desc">${esc(d.text)}</p>
     ${d.fallback ? `<p class="fallback">General description of the ${esc((SYSTEM_LABEL[p.system] || L.name).toLowerCase())}.</p>` : ''}
     ${d.facts.length ? `<h3>Key facts</h3><ul class="facts">${d.facts.map((f) => `<li>${esc(f)}</li>`).join('')}</ul>` : ''}
-    ${sexNote}${borrowed}${donor}
+    ${sexNote}${borrowed}${donor}${za}
     ${actions}`;
 }
 function renderInfo(p) {
@@ -416,12 +431,12 @@ $('#infoBody').addEventListener('click', (ev) => {
   const act = ev.target.closest('[data-act]')?.dataset.act;
   const p = state.selected;
   if (!act || !p) return;
-  if (act === 'focus') focusBox(partBox(p));
+  if (act === 'focus') focusPart(p);
   if (act === 'isolate') {
     state.isolate = !state.isolate;
     applyVisibility();
     renderInfo(p);
-    if (state.isolate) focusBox(partBox(p)); else camPreset('reset');
+    if (state.isolate) focusPart(p); else camPreset('reset');
   }
   if (act === 'atlas') {
     state.atlasLayer = p.layer; state.query = ''; $('#atlasSearch').value = ''; state.page = 1;
@@ -430,9 +445,10 @@ $('#infoBody').addEventListener('click', (ev) => {
   }
 });
 
+function focusPart(p) { focusBox(partBox(p), camera, controls, viewDirFor(p)); }
 function focusBox(box, cam = camera, ctl = controls, dirOverride = null) {
   const sph = box.getBoundingSphere(new THREE.Sphere());
-  const dist = Math.max(0.18, (sph.radius / Math.sin(THREE.MathUtils.degToRad(cam.fov / 2))) * 1.3);
+  const dist = Math.max(0.24, (sph.radius / Math.sin(THREE.MathUtils.degToRad(cam.fov / 2))) * 1.3);
   const dir = dirOverride ? dirOverride.clone().normalize() : cam.position.clone().sub(ctl.target).normalize();
   const to = [sph.center.clone().add(dir.multiplyScalar(dist)), sph.center.clone()];
   if (reduceMotion) { cam.position.copy(to[0]); ctl.target.copy(to[1]); invalidate(); return; }
@@ -547,7 +563,7 @@ $$('.sex-toggle button').forEach((b) => b.addEventListener('click', () => setSex
 
 function renderCoverage() {
   const B = bodies[state.sex];
-  const credit = 'Anatomy data: BodyParts3D © DBCLS (CC BY 4.0)' + (state.sex === 'female' ? '; HuBMAP Human Reference Atlas and Andreassen et al. 2023 (CC BY 4.0)' : '') + ', packaged by the open-source Human Atlas project.';
+  const credit = 'Anatomy data: BodyParts3D © DBCLS (CC BY 4.0)' + (state.sex === 'female' ? '; HuBMAP Human Reference Atlas and Andreassen et al. 2023 (CC BY 4.0)' : '; face, deep back and abdominal-wall muscles from Z-Anatomy (CC BY-SA 4.0)') + ', packaged by the open-source Human Atlas project.';
   $('#coverage').innerHTML = (state.sex === 'male'
     ? `Adult male reference body (BodyParts3D 4.0): ${fmt(B.parts.length)} separately selectable structures.`
     : `Adult female reference body (Human Reference Atlas): ${fmt(B.parts.length)} structures. Its source has no muscles above the hips, and its skull, rib, arm and foot bones are taken from the male body and shown in grey.`)
@@ -642,7 +658,7 @@ async function renderAtlas() {
   }
   const list = atlasList();
   const shown = list.slice(0, state.page * PAGE);
-  $('#atlasSub').textContent = `${fmt(list.length)} ${LAYER[state.atlasLayer].name.toLowerCase()} structures${state.oneSide ? ' (one side shown for paired ones)' : ''} · ${state.sex === 'female' ? '♀ female' : '♂ male'} body · select one to see it in the whole system`;
+  $('#atlasSub').textContent = `${fmt(list.length)} structures in ${LAYER[state.atlasLayer].name}${state.oneSide ? ' (one side shown for paired ones)' : ''} · ${state.sex === 'female' ? '♀ female' : '♂ male'} body · select one to see it in the whole system`;
   grid.innerHTML = shown.length ? shown.map((p) => `
     <button type="button" class="card${state.ctx?.p === p ? ' selected' : ''}" data-n="${p.n}">
       <span class="thumb"><img alt="" width="260" height="260"></span>
@@ -653,10 +669,13 @@ async function renderAtlas() {
   $('#btnMore').parentElement.hidden = shown.length >= list.length;
   $('#btnMore').textContent = `Show More (${fmt(list.length - shown.length)} Left)`;
 }
-$('#catTabs').addEventListener('click', (e) => { const b = e.target.closest('[data-layer]'); if (!b) return; state.atlasLayer = b.dataset.layer; state.page = 1; renderAtlas(); });
+$('#catTabs').addEventListener('click', (e) => { const b = e.target.closest('[data-layer]'); if (!b) return; state.atlasLayer = b.dataset.layer; state.page = 1; atlasEl.scrollTop = 0; renderAtlas(); });
 $('#atlasSearch').addEventListener('input', (e) => { state.query = e.target.value.trim(); state.page = 1; renderAtlas(); });
 $('#oneSide').addEventListener('change', (e) => { state.oneSide = e.target.checked; state.page = 1; renderAtlas(); });
 $('#btnMore').addEventListener('click', () => { state.page++; renderAtlas(); });
+const atlasEl = $('#atlas'), topBtn = $('#btnTop');
+atlasEl.addEventListener('scroll', () => { topBtn.hidden = atlasEl.scrollTop < 400; }, { passive: true });
+topBtn.addEventListener('click', () => { atlasEl.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' }); $('#catTabs [aria-selected="true"]')?.focus({ preventScroll: true }); });
 $('#grid').addEventListener('click', (e) => { const c = e.target.closest('.card'); if (c) openContext(bodies[state.sex].parts[+c.dataset.n]); });
 
 // ---- context slide: the structure inside its whole system ----
