@@ -9,7 +9,10 @@ A 3D human anatomy website with a beige theme. It shows the **skeleton (34 bone 
 - **Parts Atlas**: every bone, muscle and nerve is shown on its own, piece by piece. You can filter by body system, by region or by name.
 - **Full-body location view**: clicking a piece in the Atlas slides in a 3D panel from the right. It shows that piece highlighted inside its own system only. For example, a bone is shown in the full skeleton with no muscles or nerves.
 
-## Running it
+## Live website
+The site is published with GitHub Pages at **https://huti7.github.io/human-anatomy-3d./**. Every push to `main` republishes it automatically (see `.github/workflows/pages.yml`).
+
+## Running it locally
 There is no build step. Serve this folder with any static web server (ES modules need http://):
 
 ```bash
