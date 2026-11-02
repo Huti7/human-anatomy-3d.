@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Anatomica 3D</title>
+  <meta name="description" content="Interactive 3D human anatomy: skin, bones, muscles, nerves, joints, heart and vessels, lymphatic system and internal organs, for a male and a female body." />
+  <meta name="theme-color" content="#f3ead9" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Fraunces:opsz,wght@9..144,500;9..144,650&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23a0703f'/%3E%3Ctext x='32' y='43' font-size='32' text-anchor='middle' fill='%23fff9ef' font-family='Georgia'%3EA%3C/text%3E%3C/svg%3E" />
+  <script type="importmap">{ "imports": { "three": "./lib/three.module.js" } }</script>
+</head>
+<body>
+  <a class="skip" href="#systems">Skip to anatomical systems</a>
+  <header class="topbar">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="7" r="4.5"/><path d="M16 12v10M9 14l7 3 7-3M12 30l4-8 4 8"/></svg>
+      <div>
+        <h1>Anatomica <span>3D</span></h1>
+        <p id="scopeLine">Interactive human anatomy</p>
+      </div>
+    </div>
+    <nav class="tabs" aria-label="Views">
+      <a class="tab active" href="#explorer" data-view="explorer" aria-current="page">3D Body Explorer</a>
+      <a class="tab" href="#atlas" data-view="atlas">Parts Atlas</a>
+    </nav>
+  </header>
+
+  <!-- ========== 3D EXPLORER ========== -->
+  <main id="explorer" class="view active">
+    <div id="viewport" aria-label="3D model of the human body. Drag to rotate, scroll to zoom, click a structure to learn about it."></div>
+    <div id="tooltip" class="tooltip" aria-hidden="true"></div>
+    <div id="layerStatus" class="layer-status" role="status" aria-live="polite"></div>
+
+    <aside id="infoPanel" class="slide slide-left" aria-hidden="true" aria-label="Structure details">
+      <button type="button" class="close" data-close="infoPanel" aria-label="Close details">×</button>
+      <div class="slide-body" id="infoBody"></div>
+    </aside>
+
+    <section class="systems" id="systems" aria-labelledby="systemsTitle">
+      <div class="systems-head">
+        <h2 id="systemsTitle">Anatomical systems</h2>
+        <button type="button" id="btnClear" class="text-btn">Clear</button>
+      </div>
+      <div class="segmented sex-toggle" role="radiogroup" aria-label="Reference body">
+        <button type="button" role="radio" aria-checked="true" data-sex="male"><span aria-hidden="true">♂</span> Male</button>
+        <button type="button" role="radio" aria-checked="false" data-sex="female"><span aria-hidden="true">♀</span> Female</button>
+      </div>
+      <div id="systemList" class="system-list"></div>
+      <label class="search" for="search">
+        <span class="visually-hidden">Search structures</span>
+        <input id="search" name="search" type="search" placeholder="Search structures…" autocomplete="off" spellcheck="false" />
+      </label>
+      <ul id="searchResults" class="search-results" aria-label="Search results"></ul>
+      <p class="coverage" id="coverage"></p>
+    </section>
+
+    <div class="toolbar" role="toolbar" aria-label="View controls">
+      <button type="button" data-cam="front">Front</button>
+      <button type="button" data-cam="back">Back</button>
+      <button type="button" data-cam="left">Left</button>
+      <button type="button" data-cam="right">Right</button>
+      <span class="sep" aria-hidden="true"></span>
+      <button type="button" id="btnZoomIn" aria-label="Zoom in">+</button>
+      <button type="button" id="btnZoomOut" aria-label="Zoom out">−</button>
+      <span class="sep" aria-hidden="true"></span>
+      <button type="button" id="btnXray" aria-pressed="false">X-ray</button>
+      <button type="button" id="btnRotate" aria-pressed="false">Spin</button>
+      <button type="button" data-cam="reset">Reset</button>
+    </div>
+  </main>
+
+  <!-- ========== PARTS ATLAS ========== -->
+  <main id="atlas" class="view">
+    <div class="atlas-head">
+      <div class="atlas-row">
+        <div class="cat-tabs" id="catTabs" role="tablist" aria-label="Anatomical systems"></div>
+        <div class="segmented sex-toggle small" role="radiogroup" aria-label="Reference body">
+          <button type="button" role="radio" aria-checked="true" data-sex="male"><span aria-hidden="true">♂</span> Male</button>
+          <button type="button" role="radio" aria-checked="false" data-sex="female"><span aria-hidden="true">♀</span> Female</button>
+        </div>
+      </div>
+      <div class="atlas-tools">
+        <label class="search grow" for="atlasSearch">
+          <span class="visually-hidden">Filter structures</span>
+          <input id="atlasSearch" name="atlasSearch" type="search" placeholder="Filter by name, e.g. femur, deltoid, vagus…" autocomplete="off" spellcheck="false" />
+        </label>
+        <label class="check" for="oneSide"><input type="checkbox" id="oneSide" checked /> Left side only for paired structures</label>
+      </div>
+      <p class="atlas-sub" id="atlasSub" aria-live="polite"></p>
+    </div>
+    <div class="grid" id="grid"></div>
+    <div class="more"><button type="button" id="btnMore" class="btn ghost">Show More</button></div>
+    <button type="button" id="btnTop" class="to-top" hidden aria-label="Back to top"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg><span>Top</span></button>
+
+    <div class="backdrop" id="backdrop"></div>
+    <aside id="contextPanel" class="slide slide-right" aria-hidden="true" aria-label="Structure in the whole body">
+      <button type="button" class="close" data-close="contextPanel" aria-label="Close full-body view">×</button>
+      <div class="ctx-head" id="ctxHead"></div>
+      <div class="ctx-stage">
+        <div id="ctxViewport" aria-label="The selected structure shown inside its whole system"></div>
+        <div class="ctx-tools">
+          <button type="button" id="ctxZoom" aria-pressed="false">Zoom to Part</button>
+          <button type="button" id="ctxFull" aria-pressed="true" class="active">Full Body</button>
+        </div>
+        <div class="ctx-legend" id="ctxLegend"></div>
+      </div>
+      <div class="slide-body" id="ctxBody"></div>
+    </aside>
+  </main>
+
+  <div id="loading" class="loading"><div class="spinner" aria-hidden="true"></div><p>Loading the human body…</p></div>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
